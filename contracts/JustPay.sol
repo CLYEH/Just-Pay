@@ -228,7 +228,7 @@ contract JustPayContract{
 }
 
 contract Factory {
-    event ContractDeployed(address deployedAddress);
+    event ContractDeployed(address indexed deployedAddress);
 
     function computeAddress(uint256 _salt_int, address signer, address operator) external view returns (address) {
         bytes32 _salt = bytes32(_salt_int);
