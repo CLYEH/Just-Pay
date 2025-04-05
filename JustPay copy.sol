@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 
 interface ITokenMessengerV2 {
     function depositForBurn(
@@ -169,16 +170,47 @@ contract JustPayContract{
         }else{revert("signature invalid!");}
     }
 
-    function proxyReceiveMessage(
+    function testSignature(
         Permit calldata permit,
         uint8 v,
         bytes32 r,
-        bytes32 s,
-        uint32 destinationDomain,
+        bytes32 s
+    ) external returns(bool){
+        bool output = verifyPermit(permit, v, r, s);
+        return output;
+    }
+
+    /*
+    function proxyReceiveMessage(
         bytes calldata message,
         bytes calldata attestation
     ) external onlyOperator{
 
     }
+    */
 
+}
+
+contract Factory {
+    event ContractDeployed(address deployedAddress);
+
+    function computeAddress(uint256 _salt_int, address signer, address operator) external view returns (address) {
+        bytes32 _salt = bytes32(_salt_int);
+        bytes memory bytecode = abi.encodePacked(
+            type(JustPayContract).creationCode,
+            abi.encode(signer, operator)
+        );
+        return Create2.computeAddress(_salt, keccak256(bytecode), address(this));
+    }
+
+    function deploy(uint256 _salt_int, address signer, address operator) external returns (address) {
+        bytes32 _salt = bytes32(_salt_int);
+        bytes memory bytecode = abi.encodePacked(
+            type(JustPayContract).creationCode,
+            abi.encode(signer, operator)
+        );
+        address deployedAddr = Create2.deploy(0, _salt, bytecode);
+        emit ContractDeployed(deployedAddr);
+        return deployedAddr;
+    }
 }
