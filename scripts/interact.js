@@ -8,8 +8,8 @@ const types = ["uint256[]", "uint256[]", "uint256[]", "uint256", "address"];
 const values = [
     [84532],
     [100000],
-    [1],
-  1,
+    [2],
+  11155111,
   "0x3d94E55a2C3Cf83226b3D056eBeBb43b4731417f"
 ];
 

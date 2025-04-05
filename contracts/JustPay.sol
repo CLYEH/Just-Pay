@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
@@ -61,43 +61,6 @@ contract JustPayContract{
         _;
     }
 
-    // modifier onlySigned(
-    //     uint256[] memory sourceChainIds, 
-    //     uint256[] memory amount,
-    //     uint256[] memory nonce, 
-    //     uint256 destinationChainId,
-    //     address targetAddress,
-    //     bytes memory signature
-    // ){
-    //     uint256 localIndex;
-    //     // Check if sourcechain is approved
-    //     bool matched = false;
-    //     for(uint256 i = 0; i < sourceChainIds.length; i += 1){
-    //         if(sourceChainIds[i] == block.chainid){
-    //             localIndex = i;
-    //             matched = true;
-    //             break;
-    //         }
-    //     }
-    //     require(matched, "not authorized in this chain!");
-    //     // check if this signature had been used
-    //     require(!usedNonces[nonce],"nonce used!");
-    //     usedNonces[nonce] = true;
-
-    //     // 將訊息 hash 化
-    //     bytes32 messageHash = keccak256(abi.encode(sourceChainIds, nonce));
-
-    //     // 轉成 eth_signed message hash（自動加上前綴）
-    //     bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
-
-    //     // 使用 ECDSA 恢復簽名者
-    //     (bytes32 r, bytes32 s, uint8 v) = splitSignature(signature);
-    //     address recovered = ecrecover(ethSignedMessageHash, v, r, s);
-    //     //address recovered = ethSignedMessageHash.recover(signature);
-    //     require(recovered == signer, "Invalid signature");
-    //     _;
-    // }
-
     constructor(address _signer, address _operator){
         signer = _signer;
         operator = _operator;
@@ -129,11 +92,13 @@ contract JustPayContract{
         uint256[] memory sourceChainIds, 
         uint256[] memory amountEach,
         uint256[] memory nonces, 
+        uint256 expirey,
         uint256 destinationChainId,
         address targetAddress,
         bytes memory signature
         ) public 
         returns(LocalSignature memory){
+            require(block.timestamp < expirey, "signature is expired");
             uint256 localIndex;
             bool matched = false;
             for(uint256 i = 0; i < sourceChainIds.length; i += 1){
@@ -182,12 +147,14 @@ contract JustPayContract{
         address token,
         uint256[] memory sourceChainIds, 
         uint256[] memory amountEach,
-        uint256[] memory nonces, 
+        uint256[] memory nonces,
+        uint256 expirey,
         uint256 destinationChainId,
         address targetAddress,
         bytes memory signature
         )external onlyOperator {
-            LocalSignature memory sigContent = signatureVerifier(sourceChainIds, amountEach, nonces, destinationChainId, targetAddress, signature);
+            LocalSignature memory sigContent = signatureVerifier(sourceChainIds, amountEach, nonces, expirey, destinationChainId, targetAddress, signature);
+            require(destinationChainId == block.chainid);
             address to = sigContent.targetAddress;
             uint256 amount = arraySum(amountEach);
             IERC20(token).transferFrom(signer, to, amount);
@@ -200,12 +167,13 @@ contract JustPayContract{
         uint32 minFinalityThreshold,
         uint256[] memory sourceChainIds, 
         uint256[] memory amountEach,
-        uint256[] memory nonces, 
+        uint256[] memory nonces,
+        uint256 expirey,
         uint256 destinationChainId,
         address targetAddress,
         bytes memory signature
     ) external onlyOperator{
-        LocalSignature memory sigContent = signatureVerifier(sourceChainIds, amountEach, nonces, destinationChainId, targetAddress, signature);
+        LocalSignature memory sigContent = signatureVerifier(sourceChainIds, amountEach, nonces, expirey, destinationChainId, targetAddress, signature);
         
         uint256 amount = sigContent.amount;
         uint32 destinationDomain = uint32(domainId[sigContent.destinationChainId]);

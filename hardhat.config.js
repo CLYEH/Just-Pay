@@ -8,7 +8,7 @@ const { PRIVATE_KEY, ETHERSCAN_API_KEY, BASESCAN_API_KEY, LINEASCAN_API_KEY } = 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
-    version: "0.8.19",
+    version: "0.8.17",
     settings: {
       evmVersion: "london",
       optimizer: {
