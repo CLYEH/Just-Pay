@@ -114,7 +114,7 @@ contract JustPayContract{
             emit usedNoncesEvent(uint32(block.chainid), nonces[localIndex]);
 
             // 將訊息 hash 化
-            bytes32 messageHash = keccak256(abi.encode(sourceChainIds, amountEach, nonces, destinationChainId, targetAddress));
+            bytes32 messageHash = keccak256(abi.encode(sourceChainIds, amountEach, nonces, expirey, destinationChainId, targetAddress));
             // 轉成 eth_signed message hash（自動加上前綴）
             bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
             // 使用 ECDSA 恢復簽名者
