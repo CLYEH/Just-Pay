@@ -4,13 +4,14 @@ import { ethers } from "ethers";
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
 // 定義型別與值
-const types = ["uint256[]", "uint256[]", "uint256[]", "uint256", "address"];
+const types = ["uint256[]", "uint256[]", "uint256[]", "uint256", "uint256", "address"];
 const values = [
-    [84532],
-    [100000],
-    [2],
-  11155111,
-  "0x3d94E55a2C3Cf83226b3D056eBeBb43b4731417f"
+  [11155111],
+  [100000],
+  [0],
+  1743878343,
+  84532,
+  "0x55F574536032599068C2Ce9E73f18d244345E262"
 ];
 
 // ABI encode 並計算 keccak256
