@@ -214,13 +214,26 @@ contract JustPayContract{
     function depositToAAVE(address aaveV3, address asset, uint256 amount) public onlyOperator{
         IERC20(asset).transferFrom(signer, address(this), amount);
         
-        // 授權給 Swap 合約
+        // 記錄 swap 前的餘額
+        uint256 balanceBefore = IERC20(0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f).balanceOf(address(this));
+        
+        // 授權並執行 swap
         IERC20(asset).approve(0x364687AAF0A70c418Fe5FF8e9746B254f319B33E, amount);
         ISwap(0x364687AAF0A70c418Fe5FF8e9746B254f319B33E).swap(asset, 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f, amount);
         
-        // 授權給 AAVE 合約
-        IERC20(0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f).approve(aaveV3, amount);
-        IAAVEV3(aaveV3).supply(0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f, amount, signer, 0);
+        // ✅ 計算實際收到的代幣數量
+        uint256 balanceAfter = IERC20(0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f).balanceOf(address(this));
+        uint256 receivedAmount = balanceAfter - balanceBefore;
+        
+        // ✅ 確保有收到代幣
+        require(receivedAmount > 0, "Swap failed or received 0 tokens");
+        
+        // ✅ 使用實際數量進行授權和存款
+        IERC20(0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f).approve(aaveV3, receivedAmount);
+        IAAVEV3(aaveV3).supply(0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f, receivedAmount, signer, 0);
+        
+        // ✅ 添加事件記錄
+        emit tokenTransferEvent(signer, receivedAmount); // 或創建新的事件
     }
 
     function proxyDepositForBurnV2(
