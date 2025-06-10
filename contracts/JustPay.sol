@@ -4,6 +4,10 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 
+interface ISwap{
+    function swap(address tokenIn, address tokenOut, uint256 amount) external;
+}
+
 interface ITokenMessengerV2 {
     function depositForBurn(
         uint256 amount,
@@ -18,6 +22,20 @@ interface ITokenMessengerV2 {
 
 interface IMessageTransmitterV2{
     function receiveMessage(bytes calldata message, bytes calldata attestation) external returns(bool);
+}
+
+interface IAAVEV3{
+    function withdraw(
+        address asset,
+        uint256 amount,
+        address to
+    ) external;
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        uint16 referralCode
+    ) external;
 }
 
 contract JustPayContract{
@@ -193,6 +211,50 @@ contract JustPayContract{
         IMessageTransmitterV2(messageTransmitterV2).receiveMessage(message, attestation);
     }
 
+    function depositToAAVE(address aaveV3, address asset, uint256 amount) public onlyOperator{
+        IERC20(asset).transferFrom(signer, address(this), amount);
+        
+        // 授權給 Swap 合約
+        IERC20(asset).approve(0x364687AAF0A70c418Fe5FF8e9746B254f319B33E, amount);
+        ISwap(0x364687AAF0A70c418Fe5FF8e9746B254f319B33E).swap(asset, 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f, amount);
+        
+        // 授權給 AAVE 合約
+        IERC20(0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f).approve(aaveV3, amount);
+        IAAVEV3(aaveV3).supply(0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f, amount, signer, 0);
+    }
+
+    function proxyDepositForBurnV2(
+        address burnToken,
+        uint256 maxFee,
+        uint32 minFinalityThreshold,
+        uint256[] memory sourceChainIds, 
+        uint256[] memory amountEach,
+        uint256[] memory nonces,
+        uint256 expirey,
+        uint256 destinationChainId,
+        address targetAddress,
+        address aaveV3,
+        uint256 amountWithdrawFromAAVE,
+        bytes memory signature
+    ) external onlyOperator{
+        LocalSignature memory sigContent = signatureVerifier(sourceChainIds, amountEach, nonces, expirey, destinationChainId, targetAddress, signature);
+        
+        uint256 amount = sigContent.amount;
+        uint32 destinationDomain = uint32(domainId[sigContent.destinationChainId]);
+        bytes32 mintRecipient = bytes32(uint256(uint160(signer)));
+        bytes32 destinationCaller = bytes32(uint256(uint160(address(0))));
+
+        if (amountWithdrawFromAAVE > 0){
+            IAAVEV3(aaveV3).withdraw(0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f, amountWithdrawFromAAVE, address(this));
+            ISwap(0x364687AAF0A70c418Fe5FF8e9746B254f319B33E).swap(0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f, burnToken, amountWithdrawFromAAVE);
+        }
+
+        IERC20(burnToken).approve(tokenMessengerV2, amount);
+        IERC20(burnToken).transferFrom(signer, address(this), amount);
+        ITokenMessengerV2(tokenMessengerV2).depositForBurn(amount, destinationDomain, mintRecipient, burnToken, destinationCaller, maxFee, minFinalityThreshold);
+        emit depositForBurnEvent(amount);
+    }
+
 }
 
 contract Factory {
@@ -216,5 +278,27 @@ contract Factory {
         address deployedAddr = Create2.deploy(0, _salt, bytecode);
         emit ContractDeployed(deployedAddr);
         return deployedAddr;
+    }
+}
+
+
+contract Swap{
+    address public aaveTestUSDC = 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f;
+    address public circleTestUSDC = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
+
+    address public signer;
+
+    constructor(){
+        signer = msg.sender;
+    }
+
+    function swap(address tokenIn, address tokenOut, uint256 amount) external{
+        IERC20(tokenIn).transferFrom(msg.sender, address(this), amount);
+        IERC20(tokenOut).transfer(msg.sender, amount);
+    }
+
+    function withdraw(address token, uint256 amount) external{
+        require(msg.sender == signer, "You are not the signer!");
+        IERC20(token).transfer(signer, amount);
     }
 }
